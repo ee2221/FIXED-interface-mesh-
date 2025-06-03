@@ -216,6 +216,13 @@ export const useSceneStore = create<SceneState>((set, get) => ({
       state.selectedObject.geometry.dispose();
       state.selectedObject.geometry = newGeometry;
 
-      return state;
+      return {
+        ...state,
+        selectedElements: {
+          vertices: [],
+          edges: [],
+          faces: []
+        }
+      };
     }),
 }));
