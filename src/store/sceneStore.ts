@@ -159,14 +159,11 @@ export const useSceneStore = create<SceneState>((set, get) => ({
         }
       }
 
-      set((state) => ({
+      return {
         selectedElements: {
           ...state.selectedElements,
           vertices: overlappingIndices
-        }
-      }));
-
-      return {
+        },
         draggedVertex: {
           indices: overlappingIndices,
           position: position.clone(),
@@ -215,7 +212,7 @@ export const useSceneStore = create<SceneState>((set, get) => ({
       const initialPositions = positions.map(p => p.clone());
 
       // Find all edges that share the same vertices
-      for (let i = 0; i < positionAttribute.count; i += 2) {
+      for (let i = 0; i < positionAttribute.count - 1; i++) {
         const pos1 = new THREE.Vector3(
           positionAttribute.getX(i),
           positionAttribute.getY(i),
@@ -227,18 +224,22 @@ export const useSceneStore = create<SceneState>((set, get) => ({
           positionAttribute.getZ(i + 1)
         );
 
-        if (positions.some(p => p.distanceTo(pos1) < 0.0001) &&
-            positions.some(p => p.distanceTo(pos2) < 0.0001)) {
+        if ((positions[0].distanceTo(pos1) < 0.0001 && positions[1].distanceTo(pos2) < 0.0001) ||
+            (positions[0].distanceTo(pos2) < 0.0001 && positions[1].distanceTo(pos1) < 0.0001)) {
           overlappingEdges.push([i, i + 1]);
           allPositions.push(pos1.clone(), pos2.clone());
         }
       }
 
       return {
+        selectedElements: {
+          ...state.selectedElements,
+          edges: overlappingEdges.map((_, i) => i)
+        },
         draggedEdge: {
           indices: overlappingEdges,
           positions: allPositions,
-          initialPositions: initialPositions
+          initialPositions
         }
       };
     }),
@@ -249,20 +250,28 @@ export const useSceneStore = create<SceneState>((set, get) => ({
 
       const geometry = state.selectedObject.geometry;
       const positions = geometry.attributes.position;
-      
-      state.draggedEdge.indices.forEach(([v1, v2], index) => {
-        const offset = position.clone().sub(state.draggedEdge.initialPositions[index]);
-        
-        const newPos1 = state.draggedEdge.positions[index * 2].clone().add(offset);
-        const newPos2 = state.draggedEdge.positions[index * 2 + 1].clone().add(offset);
-        
-        positions.setXYZ(v1, newPos1.x, newPos1.y, newPos1.z);
-        positions.setXYZ(v2, newPos2.x, newPos2.y, newPos2.z);
+      const offset = position.clone().sub(state.draggedEdge.initialPositions[0]);
+
+      state.draggedEdge.indices.forEach(([v1, v2]) => {
+        const pos1 = new THREE.Vector3(
+          positions.getX(v1),
+          positions.getY(v1),
+          positions.getZ(v1)
+        ).add(offset);
+
+        const pos2 = new THREE.Vector3(
+          positions.getX(v2),
+          positions.getY(v2),
+          positions.getZ(v2)
+        ).add(offset);
+
+        positions.setXYZ(v1, pos1.x, pos1.y, pos1.z);
+        positions.setXYZ(v2, pos2.x, pos2.y, pos2.z);
       });
 
       positions.needsUpdate = true;
       geometry.computeVertexNormals();
-      
+
       return state;
     }),
 
