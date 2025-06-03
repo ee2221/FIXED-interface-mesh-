@@ -265,7 +265,7 @@ export const useSceneStore = create<SceneState>((set, get) => ({
       const positions = geometry.attributes.position;
       const offset = position.clone().sub(state.draggedEdge.initialPositions[0]);
       
-      // Move all connected vertices together
+      // Move all connected vertices together while maintaining edge shape
       const processedVertices = new Set();
       state.draggedEdge.indices.forEach(([v1, v2]) => {
         if (!processedVertices.has(v1)) {
