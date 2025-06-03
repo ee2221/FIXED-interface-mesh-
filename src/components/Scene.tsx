@@ -152,7 +152,6 @@ const EdgeLines = ({ geometry, object }) => {
   const edges = [];
   const worldMatrix = object.matrixWorld;
 
-  // Create edge pairs from vertices
   for (let i = 0; i < positions.count; i++) {
     for (let j = i + 1; j < positions.count; j++) {
       const v1 = new THREE.Vector3(
@@ -168,14 +167,15 @@ const EdgeLines = ({ geometry, object }) => {
       ).applyMatrix4(worldMatrix);
 
       if (v1.distanceTo(v2) < 2) { // Threshold for connected vertices
-        edges.push({ vertices: [i, j], positions: [v1, v2] });
+        const midpoint = v1.clone().add(v2).multiplyScalar(0.5);
+        edges.push({ vertices: [i, j], positions: [v1, v2], midpoint });
       }
     }
   }
 
   return editMode === 'edge' ? (
     <group>
-      {edges.map(({ vertices: [v1, v2], positions: [p1, p2] }, i) => {
+      {edges.map(({ vertices: [v1, v2], positions: [p1, p2], midpoint }, i) => {
         const points = [p1, p2];
         const geometry = new THREE.BufferGeometry().setFromPoints(points);
         const isSelected = selectedElements.edges.includes(v1) || selectedElements.edges.includes(v2);
@@ -194,23 +194,9 @@ const EdgeLines = ({ geometry, object }) => {
                 linewidth={2}
               />
             </line>
-            {/* Edge endpoint controls */}
+            {/* Edge midpoint control */}
             <mesh
-              position={p1}
-              onClick={(e) => {
-                e.stopPropagation();
-                startEdgeDrag([v1, v2], [p1, p2]);
-              }}
-            >
-              <sphereGeometry args={[0.05]} />
-              <meshBasicMaterial
-                color={isSelected ? 'red' : 'yellow'}
-                transparent
-                opacity={0.5}
-              />
-            </mesh>
-            <mesh
-              position={p2}
+              position={midpoint}
               onClick={(e) => {
                 e.stopPropagation();
                 startEdgeDrag([v1, v2], [p1, p2]);
