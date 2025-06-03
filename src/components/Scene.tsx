@@ -82,7 +82,8 @@ const VertexCountSelector = () => {
     options = [
       { value: 64, label: '64 Vertices' },
       { value: 32, label: '32 Vertices' },
-      { value: 16, label: '16 Vertices' }
+      { value: 16, label: '16 Vertices' },
+      { value: 8, label: '8 Vertices' }
     ];
     onChange = updateSphereVertices;
   }
