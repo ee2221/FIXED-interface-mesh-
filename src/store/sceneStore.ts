@@ -159,18 +159,15 @@ export const useSceneStore = create<SceneState>((set, get) => ({
         }
       }
 
-      set((state) => ({
-        selectedElements: {
-          ...state.selectedElements,
-          vertices: overlappingIndices
-        }
-      }));
-
       return {
         draggedVertex: {
           indices: overlappingIndices,
           position: position.clone(),
           initialPosition: position.clone()
+        },
+        selectedElements: {
+          ...state.selectedElements,
+          vertices: overlappingIndices
         }
       };
     }),
@@ -212,33 +209,50 @@ export const useSceneStore = create<SceneState>((set, get) => ({
       const positionAttribute = geometry.attributes.position;
       const overlappingEdges = [];
       const allPositions = [];
-      const initialPositions = positions.map(p => p.clone());
+      const initialPositions = [];
+      const processedVertices = new Set();
 
-      // Find all edges that share the same vertices
-      for (let i = 0; i < positionAttribute.count; i += 2) {
-        const pos1 = new THREE.Vector3(
-          positionAttribute.getX(i),
-          positionAttribute.getY(i),
-          positionAttribute.getZ(i)
-        );
-        const pos2 = new THREE.Vector3(
-          positionAttribute.getX(i + 1),
-          positionAttribute.getY(i + 1),
-          positionAttribute.getZ(i + 1)
+      // Find all connected edges
+      const findConnectedEdges = (startIndex: number) => {
+        if (processedVertices.has(startIndex)) return;
+        processedVertices.add(startIndex);
+
+        const startPos = new THREE.Vector3(
+          positionAttribute.getX(startIndex),
+          positionAttribute.getY(startIndex),
+          positionAttribute.getZ(startIndex)
         );
 
-        if (positions.some(p => p.distanceTo(pos1) < 0.0001) &&
-            positions.some(p => p.distanceTo(pos2) < 0.0001)) {
-          overlappingEdges.push([i, i + 1]);
-          allPositions.push(pos1.clone(), pos2.clone());
+        for (let i = 0; i < positionAttribute.count; i++) {
+          if (processedVertices.has(i)) continue;
+
+          const pos = new THREE.Vector3(
+            positionAttribute.getX(i),
+            positionAttribute.getY(i),
+            positionAttribute.getZ(i)
+          );
+
+          if (pos.distanceTo(startPos) < 0.0001) {
+            overlappingEdges.push([startIndex, i]);
+            allPositions.push(startPos.clone(), pos.clone());
+            initialPositions.push(startPos.clone(), pos.clone());
+            findConnectedEdges(i);
+          }
         }
-      }
+      };
+
+      // Start the recursive search from each vertex in the selected edge
+      vertexIndices.forEach(index => findConnectedEdges(index));
 
       return {
         draggedEdge: {
           indices: overlappingEdges,
           positions: allPositions,
           initialPositions: initialPositions
+        },
+        selectedElements: {
+          ...state.selectedElements,
+          edges: Array.from(processedVertices)
         }
       };
     }),
@@ -249,15 +263,21 @@ export const useSceneStore = create<SceneState>((set, get) => ({
 
       const geometry = state.selectedObject.geometry;
       const positions = geometry.attributes.position;
+      const offset = position.clone().sub(state.draggedEdge.initialPositions[0]);
       
-      state.draggedEdge.indices.forEach(([v1, v2], index) => {
-        const offset = position.clone().sub(state.draggedEdge.initialPositions[index]);
-        
-        const newPos1 = state.draggedEdge.positions[index * 2].clone().add(offset);
-        const newPos2 = state.draggedEdge.positions[index * 2 + 1].clone().add(offset);
-        
-        positions.setXYZ(v1, newPos1.x, newPos1.y, newPos1.z);
-        positions.setXYZ(v2, newPos2.x, newPos2.y, newPos2.z);
+      // Move all connected vertices together
+      const processedVertices = new Set();
+      state.draggedEdge.indices.forEach(([v1, v2]) => {
+        if (!processedVertices.has(v1)) {
+          const newPos = state.draggedEdge.positions[0].clone().add(offset);
+          positions.setXYZ(v1, newPos.x, newPos.y, newPos.z);
+          processedVertices.add(v1);
+        }
+        if (!processedVertices.has(v2)) {
+          const newPos = state.draggedEdge.positions[1].clone().add(offset);
+          positions.setXYZ(v2, newPos.x, newPos.y, newPos.z);
+          processedVertices.add(v2);
+        }
       });
 
       positions.needsUpdate = true;
