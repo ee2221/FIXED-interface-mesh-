@@ -146,6 +146,55 @@ const VertexPoints = ({ geometry, object }) => {
   ) : null;
 };
 
+const EdgeLines = ({ geometry, object }) => {
+  const { editMode, selectedElements, startEdgeDrag } = useSceneStore();
+  const positions = geometry.attributes.position;
+  const edges = [];
+  const worldMatrix = object.matrixWorld;
+
+  // Create edge pairs from vertices
+  for (let i = 0; i < positions.count; i += 2) {
+    const v1 = new THREE.Vector3(
+      positions.getX(i),
+      positions.getY(i),
+      positions.getZ(i)
+    ).applyMatrix4(worldMatrix);
+
+    const v2 = new THREE.Vector3(
+      positions.getX(i + 1),
+      positions.getY(i + 1),
+      positions.getZ(i + 1)
+    ).applyMatrix4(worldMatrix);
+
+    edges.push({ vertices: [i, i + 1], positions: [v1, v2] });
+  }
+
+  return editMode === 'edge' ? (
+    <group>
+      {edges.map(({ vertices: [v1, v2], positions: [p1, p2] }, i) => {
+        const points = [p1, p2];
+        const geometry = new THREE.BufferGeometry().setFromPoints(points);
+        
+        return (
+          <line
+            key={i}
+            geometry={geometry}
+            onClick={(e) => {
+              e.stopPropagation();
+              startEdgeDrag([v1, v2], [p1, p2]);
+            }}
+          >
+            <lineBasicMaterial
+              color={selectedElements.edges.includes(i) ? 'red' : 'yellow'}
+              linewidth={2}
+            />
+          </line>
+        );
+      })}
+    </group>
+  ) : null;
+};
+
 const EditModeOverlay = () => {
   const { scene, camera, raycaster, pointer } = useThree();
   const { 
@@ -153,8 +202,11 @@ const EditModeOverlay = () => {
     editMode,
     setSelectedElements,
     draggedVertex,
+    draggedEdge,
     updateVertexDrag,
-    endVertexDrag
+    updateEdgeDrag,
+    endVertexDrag,
+    endEdgeDrag
   } = useSceneStore();
   const plane = useRef(new THREE.Plane());
   const intersection = useRef(new THREE.Vector3());
@@ -163,21 +215,34 @@ const EditModeOverlay = () => {
     if (!selectedObject || !editMode || !(selectedObject instanceof THREE.Mesh)) return;
 
     const handlePointerMove = (event) => {
-      if (draggedVertex) {
+      if (draggedVertex || draggedEdge) {
         const cameraDirection = new THREE.Vector3();
         camera.getWorldDirection(cameraDirection);
         plane.current.normal.copy(cameraDirection);
-        plane.current.setFromNormalAndCoplanarPoint(
-          cameraDirection,
-          draggedVertex.position
-        );
+        
+        if (draggedVertex) {
+          plane.current.setFromNormalAndCoplanarPoint(
+            cameraDirection,
+            draggedVertex.position
+          );
+        } else if (draggedEdge) {
+          plane.current.setFromNormalAndCoplanarPoint(
+            cameraDirection,
+            draggedEdge.positions[0]
+          );
+        }
 
         raycaster.setFromCamera(pointer, camera);
         if (raycaster.ray.intersectPlane(plane.current, intersection.current)) {
           const worldMatrix = selectedObject.matrixWorld;
           const inverseMatrix = new THREE.Matrix4().copy(worldMatrix).invert();
           const localPosition = intersection.current.clone().applyMatrix4(inverseMatrix);
-          updateVertexDrag(localPosition);
+          
+          if (draggedVertex) {
+            updateVertexDrag(localPosition);
+          } else if (draggedEdge) {
+            updateEdgeDrag(localPosition);
+          }
         }
       }
     };
@@ -185,6 +250,9 @@ const EditModeOverlay = () => {
     const handlePointerUp = () => {
       if (draggedVertex) {
         endVertexDrag();
+      }
+      if (draggedEdge) {
+        endEdgeDrag();
       }
     };
 
@@ -203,13 +271,21 @@ const EditModeOverlay = () => {
     pointer,
     setSelectedElements,
     draggedVertex,
+    draggedEdge,
     updateVertexDrag,
-    endVertexDrag
+    updateEdgeDrag,
+    endVertexDrag,
+    endEdgeDrag
   ]);
 
   if (!selectedObject || !editMode || !(selectedObject instanceof THREE.Mesh)) return null;
 
-  return <VertexPoints geometry={selectedObject.geometry} object={selectedObject} />;
+  return (
+    <>
+      <VertexPoints geometry={selectedObject.geometry} object={selectedObject} />
+      <EdgeLines geometry={selectedObject.geometry} object={selectedObject} />
+    </>
+  );
 };
 
 const Scene: React.FC = () => {

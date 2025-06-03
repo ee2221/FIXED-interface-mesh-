@@ -23,6 +23,11 @@ interface SceneState {
     position: THREE.Vector3;
     initialPosition: THREE.Vector3;
   } | null;
+  draggedEdge: {
+    indices: number[][];
+    positions: THREE.Vector3[];
+    initialPositions: THREE.Vector3[];
+  } | null;
   addObject: (object: THREE.Object3D, name: string) => void;
   removeObject: (id: string) => void;
   setSelectedObject: (object: THREE.Object3D | null) => void;
@@ -37,6 +42,9 @@ interface SceneState {
   startVertexDrag: (index: number, position: THREE.Vector3) => void;
   updateVertexDrag: (position: THREE.Vector3) => void;
   endVertexDrag: () => void;
+  startEdgeDrag: (vertexIndices: number[], positions: THREE.Vector3[]) => void;
+  updateEdgeDrag: (position: THREE.Vector3) => void;
+  endEdgeDrag: () => void;
   updateCylinderVertices: (vertexCount: number) => void;
   updateSphereVertices: (vertexCount: number) => void;
 }
@@ -52,6 +60,7 @@ export const useSceneStore = create<SceneState>((set, get) => ({
     faces: [],
   },
   draggedVertex: null,
+  draggedEdge: null,
 
   addObject: (object, name) =>
     set((state) => ({
@@ -194,6 +203,70 @@ export const useSceneStore = create<SceneState>((set, get) => ({
     }),
 
   endVertexDrag: () => set({ draggedVertex: null }),
+
+  startEdgeDrag: (vertexIndices, positions) =>
+    set((state) => {
+      if (!(state.selectedObject instanceof THREE.Mesh)) return state;
+
+      const geometry = state.selectedObject.geometry;
+      const positionAttribute = geometry.attributes.position;
+      const overlappingEdges = [];
+      const allPositions = [];
+      const initialPositions = positions.map(p => p.clone());
+
+      // Find all edges that share the same vertices
+      for (let i = 0; i < positionAttribute.count; i += 2) {
+        const pos1 = new THREE.Vector3(
+          positionAttribute.getX(i),
+          positionAttribute.getY(i),
+          positionAttribute.getZ(i)
+        );
+        const pos2 = new THREE.Vector3(
+          positionAttribute.getX(i + 1),
+          positionAttribute.getY(i + 1),
+          positionAttribute.getZ(i + 1)
+        );
+
+        if (positions.some(p => p.distanceTo(pos1) < 0.0001) &&
+            positions.some(p => p.distanceTo(pos2) < 0.0001)) {
+          overlappingEdges.push([i, i + 1]);
+          allPositions.push(pos1.clone(), pos2.clone());
+        }
+      }
+
+      return {
+        draggedEdge: {
+          indices: overlappingEdges,
+          positions: allPositions,
+          initialPositions: initialPositions
+        }
+      };
+    }),
+
+  updateEdgeDrag: (position) =>
+    set((state) => {
+      if (!state.draggedEdge || !(state.selectedObject instanceof THREE.Mesh)) return state;
+
+      const geometry = state.selectedObject.geometry;
+      const positions = geometry.attributes.position;
+      
+      state.draggedEdge.indices.forEach(([v1, v2], index) => {
+        const offset = position.clone().sub(state.draggedEdge.initialPositions[index]);
+        
+        const newPos1 = state.draggedEdge.positions[index * 2].clone().add(offset);
+        const newPos2 = state.draggedEdge.positions[index * 2 + 1].clone().add(offset);
+        
+        positions.setXYZ(v1, newPos1.x, newPos1.y, newPos1.z);
+        positions.setXYZ(v2, newPos2.x, newPos2.y, newPos2.z);
+      });
+
+      positions.needsUpdate = true;
+      geometry.computeVertexNormals();
+      
+      return state;
+    }),
+
+  endEdgeDrag: () => set({ draggedEdge: null }),
 
   updateCylinderVertices: (vertexCount) =>
     set((state) => {
