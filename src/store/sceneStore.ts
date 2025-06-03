@@ -24,10 +24,10 @@ interface SceneState {
     initialPosition: THREE.Vector3;
   } | null;
   draggedEdge: {
-    indices: number[][];
-    positions: THREE.Vector3[];
-    initialPositions: THREE.Vector3[];
-    connectedVertices: Set<number>;
+    index: number;
+    vertices: number[];
+    position: THREE.Vector3;
+    initialPosition: THREE.Vector3;
   } | null;
   addObject: (object: THREE.Object3D, name: string) => void;
   removeObject: (id: string) => void;
@@ -43,7 +43,7 @@ interface SceneState {
   startVertexDrag: (index: number, position: THREE.Vector3) => void;
   updateVertexDrag: (position: THREE.Vector3) => void;
   endVertexDrag: () => void;
-  startEdgeDrag: (vertexIndices: number[], positions: THREE.Vector3[]) => void;
+  startEdgeDrag: (index: number, vertices: number[], position: THREE.Vector3) => void;
   updateEdgeDrag: (position: THREE.Vector3) => void;
   endEdgeDrag: () => void;
   updateCylinderVertices: (vertexCount: number) => void;
@@ -205,54 +205,23 @@ export const useSceneStore = create<SceneState>((set, get) => ({
 
   endVertexDrag: () => set({ draggedVertex: null }),
 
-  startEdgeDrag: (vertexIndices, positions) =>
+  startEdgeDrag: (index, vertices, position) =>
     set((state) => {
       if (!(state.selectedObject instanceof THREE.Mesh)) return state;
 
-      const geometry = state.selectedObject.geometry;
-      const positionAttribute = geometry.attributes.position;
-      const overlappingEdges = [];
-      const allPositions = [];
-      const initialPositions = positions.map(p => p.clone());
-      const connectedVertices = new Set<number>();
-
-      // Find all edges that share vertices
-      for (let i = 0; i < positionAttribute.count; i++) {
-        const pos = new THREE.Vector3(
-          positionAttribute.getX(i),
-          positionAttribute.getY(i),
-          positionAttribute.getZ(i)
-        );
-
-        // Check if this vertex is connected to our edge
-        if (positions.some(p => p.distanceTo(pos) < 0.0001)) {
-          connectedVertices.add(i);
-
-          // Find connected edges
-          for (let j = 0; j < positionAttribute.count; j++) {
-            if (i === j) continue;
-            
-            const pos2 = new THREE.Vector3(
-              positionAttribute.getX(j),
-              positionAttribute.getY(j),
-              positionAttribute.getZ(j)
-            );
-
-            if (pos.distanceTo(pos2) < 1) {
-              connectedVertices.add(j);
-              overlappingEdges.push([i, j]);
-              allPositions.push(pos.clone(), pos2.clone());
-            }
-          }
+      set((state) => ({
+        selectedElements: {
+          ...state.selectedElements,
+          edges: [index]
         }
-      }
+      }));
 
       return {
         draggedEdge: {
-          indices: overlappingEdges,
-          positions: allPositions,
-          initialPositions: initialPositions,
-          connectedVertices
+          index,
+          vertices,
+          position: position.clone(),
+          initialPosition: position.clone()
         }
       };
     }),
@@ -264,11 +233,9 @@ export const useSceneStore = create<SceneState>((set, get) => ({
       const geometry = state.selectedObject.geometry;
       const positions = geometry.attributes.position;
       
-      // Calculate the movement offset
-      const offset = position.clone().sub(state.draggedEdge.initialPositions[0]);
+      const offset = position.clone().sub(state.draggedEdge.initialPosition);
       
-      // Update all connected vertices to maintain shape connectivity
-      state.draggedEdge.connectedVertices.forEach(vertexIndex => {
+      state.draggedEdge.vertices.forEach(vertexIndex => {
         const currentPos = new THREE.Vector3(
           positions.getX(vertexIndex),
           positions.getY(vertexIndex),
@@ -282,10 +249,13 @@ export const useSceneStore = create<SceneState>((set, get) => ({
       positions.needsUpdate = true;
       geometry.computeVertexNormals();
       
-      // Update initial positions for continuous dragging
-      state.draggedEdge.initialPositions = [position.clone()];
-      
-      return state;
+      return {
+        draggedEdge: {
+          ...state.draggedEdge,
+          position: position.clone(),
+          initialPosition: position.clone()
+        }
+      };
     }),
 
   endEdgeDrag: () => set({ draggedEdge: null }),
