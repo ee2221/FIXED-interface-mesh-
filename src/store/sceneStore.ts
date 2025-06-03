@@ -23,12 +23,6 @@ interface SceneState {
     position: THREE.Vector3;
     initialPosition: THREE.Vector3;
   } | null;
-  draggedEdge: {
-    vertices: number[];
-    positions: THREE.Vector3[];
-    initialPositions: THREE.Vector3[];
-    centerPoint: THREE.Vector3;
-  } | null;
   addObject: (object: THREE.Object3D, name: string) => void;
   removeObject: (id: string) => void;
   setSelectedObject: (object: THREE.Object3D | null) => void;
@@ -43,9 +37,6 @@ interface SceneState {
   startVertexDrag: (index: number, position: THREE.Vector3) => void;
   updateVertexDrag: (position: THREE.Vector3) => void;
   endVertexDrag: () => void;
-  startEdgeDrag: (vertices: number[], positions: THREE.Vector3[]) => void;
-  updateEdgeDrag: (position: THREE.Vector3) => void;
-  endEdgeDrag: () => void;
   updateCylinderVertices: (vertexCount: number) => void;
   updateSphereVertices: (vertexCount: number) => void;
 }
@@ -61,7 +52,6 @@ export const useSceneStore = create<SceneState>((set, get) => ({
     faces: [],
   },
   draggedVertex: null,
-  draggedEdge: null,
 
   addObject: (object, name) =>
     set((state) => ({
@@ -204,56 +194,6 @@ export const useSceneStore = create<SceneState>((set, get) => ({
     }),
 
   endVertexDrag: () => set({ draggedVertex: null }),
-
-  startEdgeDrag: (vertices, positions) =>
-    set((state) => {
-      if (!(state.selectedObject instanceof THREE.Mesh)) return state;
-
-      const centerPoint = new THREE.Vector3().addVectors(positions[0], positions[1]).multiplyScalar(0.5);
-
-      return {
-        draggedEdge: {
-          vertices,
-          positions: positions.map(p => p.clone()),
-          initialPositions: positions.map(p => p.clone()),
-          centerPoint: centerPoint
-        },
-        selectedElements: {
-          ...state.selectedElements,
-          edges: [vertices[0]]
-        }
-      };
-    }),
-
-  updateEdgeDrag: (position) =>
-    set((state) => {
-      if (!state.draggedEdge || !(state.selectedObject instanceof THREE.Mesh)) return state;
-
-      const geometry = state.selectedObject.geometry;
-      const positions = geometry.attributes.position;
-      
-      const offset = position.clone().sub(state.draggedEdge.centerPoint);
-      const [v1, v2] = state.draggedEdge.vertices;
-      
-      const pos1 = state.draggedEdge.initialPositions[0].clone().add(offset);
-      const pos2 = state.draggedEdge.initialPositions[1].clone().add(offset);
-
-      positions.setXYZ(v1, pos1.x, pos1.y, pos1.z);
-      positions.setXYZ(v2, pos2.x, pos2.y, pos2.z);
-
-      positions.needsUpdate = true;
-      geometry.computeVertexNormals();
-
-      return {
-        draggedEdge: {
-          ...state.draggedEdge,
-          positions: [pos1, pos2],
-          centerPoint: position.clone()
-        }
-      };
-    }),
-
-  endEdgeDrag: () => set({ draggedEdge: null }),
 
   updateCylinderVertices: (vertexCount) =>
     set((state) => {
