@@ -152,64 +152,43 @@ const EdgeLines = ({ geometry, object }) => {
   const edges = [];
   const worldMatrix = object.matrixWorld;
 
-  for (let i = 0; i < positions.count; i++) {
-    for (let j = i + 1; j < positions.count; j++) {
-      const v1 = new THREE.Vector3(
-        positions.getX(i),
-        positions.getY(i),
-        positions.getZ(i)
-      ).applyMatrix4(worldMatrix);
+  // Create edge pairs from vertices
+  for (let i = 0; i < positions.count; i += 2) {
+    const v1 = new THREE.Vector3(
+      positions.getX(i),
+      positions.getY(i),
+      positions.getZ(i)
+    ).applyMatrix4(worldMatrix);
 
-      const v2 = new THREE.Vector3(
-        positions.getX(j),
-        positions.getY(j),
-        positions.getZ(j)
-      ).applyMatrix4(worldMatrix);
+    const v2 = new THREE.Vector3(
+      positions.getX(i + 1),
+      positions.getY(i + 1),
+      positions.getZ(i + 1)
+    ).applyMatrix4(worldMatrix);
 
-      if (v1.distanceTo(v2) < 2) { // Threshold for connected vertices
-        const midpoint = v1.clone().add(v2).multiplyScalar(0.5);
-        edges.push({ vertices: [i, j], positions: [v1, v2], midpoint });
-      }
-    }
+    edges.push({ vertices: [i, i + 1], positions: [v1, v2] });
   }
 
   return editMode === 'edge' ? (
     <group>
-      {edges.map(({ vertices: [v1, v2], positions: [p1, p2], midpoint }, i) => {
+      {edges.map(({ vertices: [v1, v2], positions: [p1, p2] }, i) => {
         const points = [p1, p2];
         const geometry = new THREE.BufferGeometry().setFromPoints(points);
-        const isSelected = selectedElements.edges.includes(v1) || selectedElements.edges.includes(v2);
         
         return (
-          <group key={i}>
-            <line
-              geometry={geometry}
-              onClick={(e) => {
-                e.stopPropagation();
-                startEdgeDrag([v1, v2], [p1, p2]);
-              }}
-            >
-              <lineBasicMaterial
-                color={isSelected ? 'red' : 'yellow'}
-                linewidth={2}
-              />
-            </line>
-            {/* Edge midpoint control */}
-            <mesh
-              position={midpoint}
-              onClick={(e) => {
-                e.stopPropagation();
-                startEdgeDrag([v1, v2], [p1, p2]);
-              }}
-            >
-              <sphereGeometry args={[0.05]} />
-              <meshBasicMaterial
-                color={isSelected ? 'red' : 'yellow'}
-                transparent
-                opacity={0.5}
-              />
-            </mesh>
-          </group>
+          <line
+            key={i}
+            geometry={geometry}
+            onClick={(e) => {
+              e.stopPropagation();
+              startEdgeDrag([v1, v2], [p1, p2]);
+            }}
+          >
+            <lineBasicMaterial
+              color={selectedElements.edges.includes(i) ? 'red' : 'yellow'}
+              linewidth={2}
+            />
+          </line>
         );
       })}
     </group>
