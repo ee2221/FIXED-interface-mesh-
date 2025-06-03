@@ -149,16 +149,19 @@ const VertexPoints = ({ geometry, object }) => {
 const EdgeLines = ({ geometry, object }) => {
   const { editMode, selectedElements, startEdgeDrag } = useSceneStore();
   const positions = geometry.attributes.position;
-  const edges = new Map(); // Use Map to track unique edges
+  const edges = [];
   const worldMatrix = object.matrixWorld;
 
+  // Skip for circular shapes
   if (object.geometry instanceof THREE.SphereGeometry ||
       object.geometry instanceof THREE.CylinderGeometry ||
       object.geometry instanceof THREE.ConeGeometry) {
     return null;
   }
 
+  // Create edges based on geometry type
   if (object.geometry instanceof THREE.BoxGeometry) {
+    // Define edges for a cube
     const edgeIndices = [
       [0, 1], [1, 2], [2, 3], [3, 0], // bottom face
       [4, 5], [5, 6], [6, 7], [7, 4], // top face
@@ -178,33 +181,17 @@ const EdgeLines = ({ geometry, object }) => {
         positions.getZ(end)
       ).applyMatrix4(worldMatrix);
 
-      // Create a unique key for the edge based on vertex positions
-      const key = [
-        startVertex.x.toFixed(4),
-        startVertex.y.toFixed(4),
-        startVertex.z.toFixed(4),
-        endVertex.x.toFixed(4),
-        endVertex.y.toFixed(4),
-        endVertex.z.toFixed(4)
-      ].join(',');
-
-      // If this edge position already exists, merge the vertices
-      if (edges.has(key)) {
-        const existingEdge = edges.get(key);
-        existingEdge.vertices = [...new Set([...existingEdge.vertices, start, end])];
-      } else {
-        edges.set(key, {
-          index,
-          vertices: [start, end],
-          points: [startVertex, endVertex]
-        });
-      }
+      edges.push({
+        index,
+        vertices: [start, end],
+        points: [startVertex, endVertex]
+      });
     });
   }
 
   return editMode === 'edge' ? (
     <group>
-      {Array.from(edges.values()).map(({ index, vertices, points }) => {
+      {edges.map(({ index, vertices, points }) => {
         const [start, end] = points;
         const midpoint = start.clone().add(end).multiplyScalar(0.5);
         
