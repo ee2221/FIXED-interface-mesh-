@@ -149,23 +149,20 @@ const VertexPoints = ({ geometry, object }) => {
 const EdgeLines = ({ geometry, object }) => {
   const { editMode, selectedElements, startEdgeDrag } = useSceneStore();
   const positions = geometry.attributes.position;
-  const edges = [];
+  const edges = new Map();
   const worldMatrix = object.matrixWorld;
 
-  // Skip for circular shapes
   if (object.geometry instanceof THREE.SphereGeometry ||
       object.geometry instanceof THREE.CylinderGeometry ||
       object.geometry instanceof THREE.ConeGeometry) {
     return null;
   }
 
-  // Create edges based on geometry type
   if (object.geometry instanceof THREE.BoxGeometry) {
-    // Define edges for a cube
     const edgeIndices = [
-      [0, 1], [1, 2], [2, 3], [3, 0], // bottom face
-      [4, 5], [5, 6], [6, 7], [7, 4], // top face
-      [0, 4], [1, 5], [2, 6], [3, 7]  // vertical edges
+      [0, 1], [1, 2], [2, 3], [3, 0],
+      [4, 5], [5, 6], [6, 7], [7, 4],
+      [0, 4], [1, 5], [2, 6], [3, 7]
     ];
 
     edgeIndices.forEach(([start, end], index) => {
@@ -181,19 +178,32 @@ const EdgeLines = ({ geometry, object }) => {
         positions.getZ(end)
       ).applyMatrix4(worldMatrix);
 
-      edges.push({
-        index,
-        vertices: [start, end],
-        points: [startVertex, endVertex]
-      });
+      const key = [
+        startVertex.toArray().join(','),
+        endVertex.toArray().join(',')
+      ].sort().join('|');
+
+      if (!edges.has(key)) {
+        edges.set(key, {
+          index,
+          vertices: [start, end],
+          points: [startVertex, endVertex],
+          overlappingIndices: [index]
+        });
+      } else {
+        const edge = edges.get(key);
+        edge.overlappingIndices.push(index);
+        edge.vertices = [...new Set([...edge.vertices, start, end])];
+      }
     });
   }
 
   return editMode === 'edge' ? (
     <group>
-      {edges.map(({ index, vertices, points }) => {
+      {Array.from(edges.values()).map(({ index, vertices, points, overlappingIndices }) => {
         const [start, end] = points;
         const midpoint = start.clone().add(end).multiplyScalar(0.5);
+        const isSelected = overlappingIndices.some(i => selectedElements.edges.includes(i));
         
         return (
           <group key={index}>
@@ -209,9 +219,7 @@ const EdgeLines = ({ geometry, object }) => {
                   itemSize={3}
                 />
               </bufferGeometry>
-              <lineBasicMaterial
-                color={selectedElements.edges.includes(index) ? 'red' : 'yellow'}
-              />
+              <lineBasicMaterial color={isSelected ? 'red' : 'yellow'} />
             </line>
             <mesh
               position={midpoint}
@@ -224,7 +232,7 @@ const EdgeLines = ({ geometry, object }) => {
             >
               <sphereGeometry args={[0.05]} />
               <meshBasicMaterial
-                color={selectedElements.edges.includes(index) ? 'red' : 'yellow'}
+                color={isSelected ? 'red' : 'yellow'}
                 transparent
                 opacity={0.5}
               />
