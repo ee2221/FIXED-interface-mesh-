@@ -51,6 +51,32 @@ const VertexCoordinates = ({ position, onPositionChange }) => {
   );
 };
 
+const VertexCountSelector = () => {
+  const { selectedObject, updateCylinderVertices } = useSceneStore();
+
+  if (!(selectedObject instanceof THREE.Mesh) || 
+      !(selectedObject.geometry instanceof THREE.CylinderGeometry)) {
+    return null;
+  }
+
+  return (
+    <div className="absolute left-1/2 top-4 -translate-x-1/2 bg-black/75 text-white p-4 rounded-lg">
+      <div className="flex items-center gap-2">
+        <label className="text-sm font-medium">Vertex Count:</label>
+        <select
+          className="bg-gray-800 px-3 py-1.5 rounded text-sm"
+          onChange={(e) => updateCylinderVertices(parseInt(e.target.value))}
+          value={selectedObject.geometry.parameters.radialSegments}
+        >
+          <option value="16">16 Vertices</option>
+          <option value="8">8 Vertices</option>
+          <option value="4">4 Vertices</option>
+        </select>
+      </div>
+    </div>
+  );
+};
+
 const VertexPoints = ({ geometry, object }) => {
   const { editMode, selectedElements, startVertexDrag } = useSceneStore();
   const positions = geometry.attributes.position;
@@ -109,7 +135,6 @@ const EditModeOverlay = () => {
 
     const handlePointerMove = (event) => {
       if (draggedVertex) {
-        // Update plane normal to face camera
         const cameraDirection = new THREE.Vector3();
         camera.getWorldDirection(cameraDirection);
         plane.current.normal.copy(cameraDirection);
@@ -120,7 +145,6 @@ const EditModeOverlay = () => {
 
         raycaster.setFromCamera(pointer, camera);
         if (raycaster.ray.intersectPlane(plane.current, intersection.current)) {
-          // Transform the intersection point to object space
           const worldMatrix = selectedObject.matrixWorld;
           const inverseMatrix = new THREE.Matrix4().copy(worldMatrix).invert();
           const localPosition = intersection.current.clone().applyMatrix4(inverseMatrix);
@@ -237,6 +261,9 @@ const Scene: React.FC = () => {
           position={selectedPosition}
           onPositionChange={handlePositionChange}
         />
+      )}
+      {editMode === 'vertex' && selectedObject && (
+        <VertexCountSelector />
       )}
     </div>
   );

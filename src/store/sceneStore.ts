@@ -37,6 +37,7 @@ interface SceneState {
   startVertexDrag: (index: number, position: THREE.Vector3) => void;
   updateVertexDrag: (position: THREE.Vector3) => void;
   endVertexDrag: () => void;
+  updateCylinderVertices: (vertexCount: number) => void;
 }
 
 export const useSceneStore = create<SceneState>((set, get) => ({
@@ -137,7 +138,6 @@ export const useSceneStore = create<SceneState>((set, get) => ({
         positions.getZ(index)
       );
 
-      // Find all vertices at the same position
       for (let i = 0; i < positions.count; i++) {
         const pos = new THREE.Vector3(
           positions.getX(i),
@@ -149,7 +149,6 @@ export const useSceneStore = create<SceneState>((set, get) => ({
         }
       }
 
-      // Update selected vertices
       set((state) => ({
         selectedElements: {
           ...state.selectedElements,
@@ -173,7 +172,6 @@ export const useSceneStore = create<SceneState>((set, get) => ({
       const geometry = state.selectedObject.geometry;
       const positions = geometry.attributes.position;
       
-      // Update all overlapping vertices
       state.draggedVertex.indices.forEach(index => {
         positions.setXYZ(
           index,
@@ -195,4 +193,29 @@ export const useSceneStore = create<SceneState>((set, get) => ({
     }),
 
   endVertexDrag: () => set({ draggedVertex: null }),
+
+  updateCylinderVertices: (vertexCount) =>
+    set((state) => {
+      if (!(state.selectedObject instanceof THREE.Mesh) || 
+          !(state.selectedObject.geometry instanceof THREE.CylinderGeometry)) {
+        return state;
+      }
+
+      const oldGeometry = state.selectedObject.geometry;
+      const newGeometry = new THREE.CylinderGeometry(
+        oldGeometry.parameters.radiusTop,
+        oldGeometry.parameters.radiusBottom,
+        oldGeometry.parameters.height,
+        vertexCount,
+        oldGeometry.parameters.heightSegments,
+        oldGeometry.parameters.openEnded,
+        oldGeometry.parameters.thetaStart,
+        oldGeometry.parameters.thetaLength
+      );
+
+      state.selectedObject.geometry.dispose();
+      state.selectedObject.geometry = newGeometry;
+
+      return state;
+    }),
 }));
