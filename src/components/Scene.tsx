@@ -107,7 +107,7 @@ const VertexCountSelector = () => {
 };
 
 const VertexPoints = ({ geometry, object }) => {
-  const { editMode, selectedElements } = useSceneStore();
+  const { editMode, selectedElements, startVertexDrag } = useSceneStore();
   const positions = geometry.attributes.position;
   const vertices = [];
   const worldMatrix = object.matrixWorld;
@@ -329,8 +329,8 @@ const EditModeOverlay = () => {
 
   return (
     <>
-      {editMode === 'vertex' && <VertexPoints geometry={selectedObject.geometry} object={selectedObject} />}
-      {editMode === 'edge' && <EdgeLines geometry={selectedObject.geometry} object={selectedObject} />}
+      <VertexPoints geometry={selectedObject.geometry} object={selectedObject} />
+      <EdgeLines geometry={selectedObject.geometry} object={selectedObject} />
     </>
   );
 };
