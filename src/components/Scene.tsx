@@ -106,44 +106,6 @@ const VertexCountSelector = () => {
   );
 };
 
-const VertexPoints = ({ geometry, object }) => {
-  const { editMode, selectedElements, startVertexDrag } = useSceneStore();
-  const positions = geometry.attributes.position;
-  const vertices = [];
-  const worldMatrix = object.matrixWorld;
-  
-  for (let i = 0; i < positions.count; i++) {
-    const vertex = new THREE.Vector3(
-      positions.getX(i),
-      positions.getY(i),
-      positions.getZ(i)
-    ).applyMatrix4(worldMatrix);
-    vertices.push(vertex);
-  }
-
-  return editMode === 'vertex' ? (
-    <group>
-      {vertices.map((vertex, i) => (
-        <mesh
-          key={i}
-          position={vertex}
-          onClick={(e) => {
-            e.stopPropagation();
-            startVertexDrag(i, vertex);
-          }}
-        >
-          <sphereGeometry args={[0.05]} />
-          <meshBasicMaterial
-            color={selectedElements.vertices.includes(i) ? 'red' : 'yellow'}
-            transparent
-            opacity={0.5}
-          />
-        </mesh>
-      ))}
-    </group>
-  ) : null;
-};
-
 const EdgeLines = ({ geometry, object }) => {
   const { editMode, selectedElements, startEdgeDrag } = useSceneStore();
   const positions = geometry.attributes.position;
@@ -327,12 +289,7 @@ const EditModeOverlay = () => {
 
   if (!selectedObject || !editMode || !(selectedObject instanceof THREE.Mesh)) return null;
 
-  return (
-    <>
-      <VertexPoints geometry={selectedObject.geometry} object={selectedObject} />
-      <EdgeLines geometry={selectedObject.geometry} object={selectedObject} />
-    </>
-  );
+  return editMode === 'edge' ? <EdgeLines geometry={selectedObject.geometry} object={selectedObject} /> : null;
 };
 
 const Scene: React.FC = () => {
