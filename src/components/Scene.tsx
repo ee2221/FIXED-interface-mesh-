@@ -59,8 +59,6 @@ const VertexCountSelector = () => {
     return null;
   }
 
-  const currentVertexCount = selectedObject.geometry.parameters.radialSegments;
-
   return (
     <div className="absolute left-1/2 top-4 -translate-x-1/2 bg-black/75 text-white p-4 rounded-lg">
       <div className="flex items-center gap-2">
@@ -68,7 +66,7 @@ const VertexCountSelector = () => {
         <select
           className="bg-gray-800 px-3 py-1.5 rounded text-sm"
           onChange={(e) => updateCylinderVertices(parseInt(e.target.value))}
-          value={currentVertexCount}
+          value={selectedObject.geometry.parameters.radialSegments}
         >
           <option value="32">32 Vertices</option>
           <option value="16">16 Vertices</option>
