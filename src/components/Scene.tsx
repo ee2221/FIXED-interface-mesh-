@@ -129,7 +129,9 @@ const VertexPoints = ({ geometry, object }) => {
           position={vertex}
           onClick={(e) => {
             e.stopPropagation();
-            startVertexDrag(i, vertex);
+            if (editMode === 'vertex') {
+              startVertexDrag(i, vertex);
+            }
           }}
         >
           <sphereGeometry args={[0.05]} />
@@ -149,83 +151,41 @@ const EdgeLines = ({ geometry, object }) => {
   const positions = geometry.attributes.position;
   const edges = [];
   const worldMatrix = object.matrixWorld;
-  const [lastClickTime, setLastClickTime] = useState(0);
-  const DOUBLE_CLICK_DELAY = 300;
 
-  // Find all edges and their connected vertices
-  for (let i = 0; i < positions.count; i++) {
-    for (let j = i + 1; j < positions.count; j++) {
-      const v1 = new THREE.Vector3(
-        positions.getX(i),
-        positions.getY(i),
-        positions.getZ(i)
-      );
-      const v2 = new THREE.Vector3(
-        positions.getX(j),
-        positions.getY(j),
-        positions.getZ(j)
-      );
+  // Create edge pairs from vertices
+  for (let i = 0; i < positions.count; i += 2) {
+    const v1 = new THREE.Vector3(
+      positions.getX(i),
+      positions.getY(i),
+      positions.getZ(i)
+    ).applyMatrix4(worldMatrix);
 
-      // Check if vertices are connected (distance threshold)
-      if (v1.distanceTo(v2) < 2.0) {
-        const worldV1 = v1.clone().applyMatrix4(worldMatrix);
-        const worldV2 = v2.clone().applyMatrix4(worldMatrix);
-        const center = worldV1.clone().add(worldV2).multiplyScalar(0.5);
-        
-        edges.push({
-          vertices: [i, j],
-          position: center,
-          v1: worldV1,
-          v2: worldV2
-        });
-      }
-    }
+    const v2 = new THREE.Vector3(
+      positions.getX(i + 1),
+      positions.getY(i + 1),
+      positions.getZ(i + 1)
+    ).applyMatrix4(worldMatrix);
+
+    edges.push({ vertices: [i, i + 1], positions: [v1, v2] });
   }
-
-  // Group overlapping edges
-  const groupedEdges = edges.reduce((groups, edge, index) => {
-    const existingGroup = groups.find(group => 
-      group.some(e => 
-        (e.v1.distanceTo(edge.v1) < 0.001 && e.v2.distanceTo(edge.v2) < 0.001) ||
-        (e.v1.distanceTo(edge.v2) < 0.001 && e.v2.distanceTo(edge.v1) < 0.001)
-      )
-    );
-
-    if (existingGroup) {
-      existingGroup.push({ ...edge, index });
-    } else {
-      groups.push([{ ...edge, index }]);
-    }
-    return groups;
-  }, []);
 
   return editMode === 'edge' ? (
     <group>
-      {groupedEdges.map((group, groupIndex) => {
-        const firstEdge = group[0];
-        const points = [firstEdge.v1, firstEdge.v2];
+      {edges.map(({ vertices: [v1, v2], positions: [p1, p2] }, i) => {
+        const points = [p1, p2];
         const geometry = new THREE.BufferGeometry().setFromPoints(points);
-        const allVertices = group.flatMap(edge => edge.vertices);
         
         return (
           <line
-            key={groupIndex}
+            key={i}
             geometry={geometry}
             onClick={(e) => {
               e.stopPropagation();
-              const now = Date.now();
-              if (now - lastClickTime < DOUBLE_CLICK_DELAY) {
-                startEdgeDrag(
-                  group[0].index,
-                  allVertices,
-                  firstEdge.position
-                );
-              }
-              setLastClickTime(now);
+              startEdgeDrag([v1, v2], [p1, p2]);
             }}
           >
             <lineBasicMaterial
-              color={group.some(edge => selectedElements.edges.includes(edge.index)) ? 'red' : 'yellow'}
+              color={selectedElements.edges.includes(i) ? 'red' : 'yellow'}
               linewidth={2}
             />
           </line>
@@ -268,7 +228,7 @@ const EditModeOverlay = () => {
         } else if (draggedEdge) {
           plane.current.setFromNormalAndCoplanarPoint(
             cameraDirection,
-            draggedEdge.position
+            draggedEdge.positions[0]
           );
         }
 
@@ -329,7 +289,7 @@ const EditModeOverlay = () => {
 };
 
 const Scene: React.FC = () => {
-  const { objects, selectedObject, setSelectedObject, transformMode, editMode, draggedVertex, draggedEdge, selectedElements, updateVertexDrag, updateEdgeDrag } = useSceneStore();
+  const { objects, selectedObject, setSelectedObject, transformMode, editMode, draggedVertex, selectedElements, updateVertexDrag } = useSceneStore();
   const [selectedPosition, setSelectedPosition] = useState<THREE.Vector3 | null>(null);
 
   useEffect(() => {
@@ -350,18 +310,14 @@ const Scene: React.FC = () => {
       } else {
         setSelectedPosition(null);
       }
-    } else if (editMode === 'edge' && draggedEdge) {
-      setSelectedPosition(draggedEdge.position);
     } else {
       setSelectedPosition(null);
     }
-  }, [editMode, selectedObject, draggedVertex, draggedEdge, selectedElements.vertices]);
+  }, [editMode, selectedObject, draggedVertex, selectedElements.vertices]);
 
   const handlePositionChange = (newPosition: THREE.Vector3) => {
-    if (draggedVertex) {
+    if (selectedObject instanceof THREE.Mesh) {
       updateVertexDrag(newPosition);
-    } else if (draggedEdge) {
-      updateEdgeDrag(newPosition);
     }
   };
 
@@ -405,7 +361,7 @@ const Scene: React.FC = () => {
         <EditModeOverlay />
         <OrbitControls makeDefault />
       </Canvas>
-      {selectedPosition && (editMode === 'vertex' || editMode === 'edge') && (
+      {editMode === 'vertex' && selectedPosition && (
         <VertexCoordinates 
           position={selectedPosition}
           onPositionChange={handlePositionChange}
