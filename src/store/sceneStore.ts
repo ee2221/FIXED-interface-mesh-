@@ -23,11 +23,6 @@ interface SceneState {
     position: THREE.Vector3;
     initialPosition: THREE.Vector3;
   } | null;
-  draggedEdge: {
-    vertices: number[];
-    position: THREE.Vector3;
-    initialPosition: THREE.Vector3;
-  } | null;
   addObject: (object: THREE.Object3D, name: string) => void;
   removeObject: (id: string) => void;
   setSelectedObject: (object: THREE.Object3D | null) => void;
@@ -42,9 +37,6 @@ interface SceneState {
   startVertexDrag: (index: number, position: THREE.Vector3) => void;
   updateVertexDrag: (position: THREE.Vector3) => void;
   endVertexDrag: () => void;
-  startEdgeDrag: (vertices: number[], position: THREE.Vector3) => void;
-  updateEdgeDrag: (position: THREE.Vector3) => void;
-  endEdgeDrag: () => void;
   updateCylinderVertices: (vertexCount: number) => void;
   updateSphereVertices: (vertexCount: number) => void;
 }
@@ -60,7 +52,6 @@ export const useSceneStore = create<SceneState>((set, get) => ({
     faces: [],
   },
   draggedVertex: null,
-  draggedEdge: null,
 
   addObject: (object, name) =>
     set((state) => ({
@@ -203,44 +194,6 @@ export const useSceneStore = create<SceneState>((set, get) => ({
     }),
 
   endVertexDrag: () => set({ draggedVertex: null }),
-
-  startEdgeDrag: (vertices, position) =>
-    set((state) => ({
-      draggedEdge: {
-        vertices,
-        position: position.clone(),
-        initialPosition: position.clone()
-      }
-    })),
-
-  updateEdgeDrag: (position) =>
-    set((state) => {
-      if (!state.draggedEdge || !(state.selectedObject instanceof THREE.Mesh)) return state;
-
-      const geometry = state.selectedObject.geometry;
-      const positions = geometry.attributes.position;
-      
-      state.draggedEdge.vertices.forEach(index => {
-        positions.setXYZ(
-          index,
-          position.x,
-          position.y,
-          position.z
-        );
-      });
-
-      positions.needsUpdate = true;
-      geometry.computeVertexNormals();
-      
-      return {
-        draggedEdge: {
-          ...state.draggedEdge,
-          position: position.clone()
-        }
-      };
-    }),
-
-  endEdgeDrag: () => set({ draggedEdge: null }),
 
   updateCylinderVertices: (vertexCount) =>
     set((state) => {
