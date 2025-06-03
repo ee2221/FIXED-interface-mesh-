@@ -174,21 +174,31 @@ const EdgeLines = ({ geometry, object }) => {
       {edges.map(({ vertices: [v1, v2], positions: [p1, p2] }, i) => {
         const points = [p1, p2];
         const geometry = new THREE.BufferGeometry().setFromPoints(points);
+        const midpoint = p1.clone().add(p2).multiplyScalar(0.5);
         
         return (
-          <line
-            key={i}
-            geometry={geometry}
-            onClick={(e) => {
-              e.stopPropagation();
-              startEdgeDrag([v1, v2], [p1, p2]);
-            }}
-          >
-            <lineBasicMaterial
-              color={selectedElements.edges.includes(i) ? 'red' : 'yellow'}
-              linewidth={2}
-            />
-          </line>
+          <group key={i}>
+            <line geometry={geometry}>
+              <lineBasicMaterial
+                color={selectedElements.edges.includes(i) ? 'red' : 'yellow'}
+                linewidth={2}
+              />
+            </line>
+            <mesh
+              position={midpoint}
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                startEdgeDrag([v1, v2], [p1, p2]);
+              }}
+            >
+              <sphereGeometry args={[0.05]} />
+              <meshBasicMaterial
+                color={selectedElements.edges.includes(i) ? 'red' : 'yellow'}
+                transparent
+                opacity={0.5}
+              />
+            </mesh>
+          </group>
         );
       })}
     </group>
