@@ -152,7 +152,6 @@ const EdgeLines = ({ geometry, object }) => {
   const [lastClickTime, setLastClickTime] = useState(0);
   const DOUBLE_CLICK_DELAY = 300;
 
-  // Find all edges and their connected vertices
   for (let i = 0; i < positions.count; i++) {
     for (let j = i + 1; j < positions.count; j++) {
       const v1 = new THREE.Vector3(
@@ -166,7 +165,6 @@ const EdgeLines = ({ geometry, object }) => {
         positions.getZ(j)
       );
 
-      // Check if vertices are connected (distance threshold)
       if (v1.distanceTo(v2) < 2.0) {
         const worldV1 = v1.clone().applyMatrix4(worldMatrix);
         const worldV2 = v2.clone().applyMatrix4(worldMatrix);
@@ -182,7 +180,6 @@ const EdgeLines = ({ geometry, object }) => {
     }
   }
 
-  // Group overlapping edges
   const groupedEdges = edges.reduce((groups, edge, index) => {
     const existingGroup = groups.find(group => 
       group.some(e => 
@@ -206,29 +203,39 @@ const EdgeLines = ({ geometry, object }) => {
         const points = [firstEdge.v1, firstEdge.v2];
         const geometry = new THREE.BufferGeometry().setFromPoints(points);
         const allVertices = group.flatMap(edge => edge.vertices);
+        const isSelected = group.some(edge => selectedElements.edges.includes(edge.index));
         
         return (
-          <line
-            key={groupIndex}
-            geometry={geometry}
-            onClick={(e) => {
-              e.stopPropagation();
-              const now = Date.now();
-              if (now - lastClickTime < DOUBLE_CLICK_DELAY) {
-                startEdgeDrag(
-                  group[0].index,
-                  allVertices,
-                  firstEdge.position
-                );
-              }
-              setLastClickTime(now);
-            }}
-          >
-            <lineBasicMaterial
-              color={group.some(edge => selectedElements.edges.includes(edge.index)) ? 'red' : 'yellow'}
-              linewidth={2}
-            />
-          </line>
+          <group key={groupIndex}>
+            <line geometry={geometry}>
+              <lineBasicMaterial
+                color={isSelected ? 'red' : 'yellow'}
+                linewidth={2}
+              />
+            </line>
+            <mesh
+              position={firstEdge.position}
+              onClick={(e) => {
+                e.stopPropagation();
+                const now = Date.now();
+                if (now - lastClickTime < DOUBLE_CLICK_DELAY) {
+                  startEdgeDrag(
+                    group[0].index,
+                    allVertices,
+                    firstEdge.position
+                  );
+                }
+                setLastClickTime(now);
+              }}
+            >
+              <sphereGeometry args={[0.05]} />
+              <meshBasicMaterial
+                color={isSelected ? 'red' : 'yellow'}
+                transparent
+                opacity={0.75}
+              />
+            </mesh>
+          </group>
         );
       })}
     </group>
