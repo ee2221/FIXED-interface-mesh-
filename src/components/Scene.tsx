@@ -146,6 +146,96 @@ const VertexPoints = ({ geometry, object }) => {
   ) : null;
 };
 
+const EdgeLines = ({ geometry, object }) => {
+  const { editMode, selectedElements, startEdgeDrag } = useSceneStore();
+  const positions = geometry.attributes.position;
+  const edges = [];
+  const worldMatrix = object.matrixWorld;
+
+  // Skip for circular shapes
+  if (object.geometry instanceof THREE.SphereGeometry ||
+      object.geometry instanceof THREE.CylinderGeometry ||
+      object.geometry instanceof THREE.ConeGeometry) {
+    return null;
+  }
+
+  // Create edges based on geometry type
+  if (object.geometry instanceof THREE.BoxGeometry) {
+    // Define edges for a cube
+    const edgeIndices = [
+      [0, 1], [1, 2], [2, 3], [3, 0], // bottom face
+      [4, 5], [5, 6], [6, 7], [7, 4], // top face
+      [0, 4], [1, 5], [2, 6], [3, 7]  // vertical edges
+    ];
+
+    edgeIndices.forEach(([start, end], index) => {
+      const startVertex = new THREE.Vector3(
+        positions.getX(start),
+        positions.getY(start),
+        positions.getZ(start)
+      ).applyMatrix4(worldMatrix);
+
+      const endVertex = new THREE.Vector3(
+        positions.getX(end),
+        positions.getY(end),
+        positions.getZ(end)
+      ).applyMatrix4(worldMatrix);
+
+      edges.push({
+        index,
+        vertices: [start, end],
+        points: [startVertex, endVertex]
+      });
+    });
+  }
+
+  return editMode === 'edge' ? (
+    <group>
+      {edges.map(({ index, vertices, points }) => {
+        const [start, end] = points;
+        const midpoint = start.clone().add(end).multiplyScalar(0.5);
+        
+        return (
+          <group key={index}>
+            <line>
+              <bufferGeometry>
+                <bufferAttribute
+                  attach="attributes-position"
+                  count={2}
+                  array={new Float32Array([
+                    start.x, start.y, start.z,
+                    end.x, end.y, end.z
+                  ])}
+                  itemSize={3}
+                />
+              </bufferGeometry>
+              <lineBasicMaterial
+                color={selectedElements.edges.includes(index) ? 'red' : 'yellow'}
+              />
+            </line>
+            <mesh
+              position={midpoint}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (editMode === 'edge') {
+                  startEdgeDrag(vertices, midpoint);
+                }
+              }}
+            >
+              <sphereGeometry args={[0.05]} />
+              <meshBasicMaterial
+                color={selectedElements.edges.includes(index) ? 'red' : 'yellow'}
+                transparent
+                opacity={0.5}
+              />
+            </mesh>
+          </group>
+        );
+      })}
+    </group>
+  ) : null;
+};
+
 const EditModeOverlay = () => {
   const { scene, camera, raycaster, pointer } = useThree();
   const { 
@@ -153,8 +243,11 @@ const EditModeOverlay = () => {
     editMode,
     setSelectedElements,
     draggedVertex,
+    draggedEdge,
     updateVertexDrag,
-    endVertexDrag
+    updateEdgeDrag,
+    endVertexDrag,
+    endEdgeDrag
   } = useSceneStore();
   const plane = useRef(new THREE.Plane());
   const intersection = useRef(new THREE.Vector3());
@@ -163,13 +256,13 @@ const EditModeOverlay = () => {
     if (!selectedObject || !editMode || !(selectedObject instanceof THREE.Mesh)) return;
 
     const handlePointerMove = (event) => {
-      if (draggedVertex) {
+      if (draggedVertex || draggedEdge) {
         const cameraDirection = new THREE.Vector3();
         camera.getWorldDirection(cameraDirection);
         plane.current.normal.copy(cameraDirection);
         plane.current.setFromNormalAndCoplanarPoint(
           cameraDirection,
-          draggedVertex.position
+          draggedVertex ? draggedVertex.position : draggedEdge.position
         );
 
         raycaster.setFromCamera(pointer, camera);
@@ -177,7 +270,12 @@ const EditModeOverlay = () => {
           const worldMatrix = selectedObject.matrixWorld;
           const inverseMatrix = new THREE.Matrix4().copy(worldMatrix).invert();
           const localPosition = intersection.current.clone().applyMatrix4(inverseMatrix);
-          updateVertexDrag(localPosition);
+          
+          if (draggedVertex) {
+            updateVertexDrag(localPosition);
+          } else if (draggedEdge) {
+            updateEdgeDrag(localPosition);
+          }
         }
       }
     };
@@ -185,6 +283,9 @@ const EditModeOverlay = () => {
     const handlePointerUp = () => {
       if (draggedVertex) {
         endVertexDrag();
+      }
+      if (draggedEdge) {
+        endEdgeDrag();
       }
     };
 
@@ -203,17 +304,25 @@ const EditModeOverlay = () => {
     pointer,
     setSelectedElements,
     draggedVertex,
+    draggedEdge,
     updateVertexDrag,
-    endVertexDrag
+    updateEdgeDrag,
+    endVertexDrag,
+    endEdgeDrag
   ]);
 
   if (!selectedObject || !editMode || !(selectedObject instanceof THREE.Mesh)) return null;
 
-  return <VertexPoints geometry={selectedObject.geometry} object={selectedObject} />;
+  return (
+    <>
+      <VertexPoints geometry={selectedObject.geometry} object={selectedObject} />
+      <EdgeLines geometry={selectedObject.geometry} object={selectedObject} />
+    </>
+  );
 };
 
 const Scene: React.FC = () => {
-  const { objects, selectedObject, setSelectedObject, transformMode, editMode, draggedVertex, selectedElements, updateVertexDrag } = useSceneStore();
+  const { objects, selectedObject, setSelectedObject, transformMode, editMode, draggedVertex, draggedEdge, selectedElements, updateVertexDrag, updateEdgeDrag } = useSceneStore();
   const [selectedPosition, setSelectedPosition] = useState<THREE.Vector3 | null>(null);
 
   useEffect(() => {
@@ -234,14 +343,20 @@ const Scene: React.FC = () => {
       } else {
         setSelectedPosition(null);
       }
+    } else if (editMode === 'edge' && selectedObject instanceof THREE.Mesh && draggedEdge) {
+      setSelectedPosition(draggedEdge.position);
     } else {
       setSelectedPosition(null);
     }
-  }, [editMode, selectedObject, draggedVertex, selectedElements.vertices]);
+  }, [editMode, selectedObject, draggedVertex, draggedEdge, selectedElements.vertices]);
 
   const handlePositionChange = (newPosition: THREE.Vector3) => {
     if (selectedObject instanceof THREE.Mesh) {
-      updateVertexDrag(newPosition);
+      if (draggedVertex) {
+        updateVertexDrag(newPosition);
+      } else if (draggedEdge) {
+        updateEdgeDrag(newPosition);
+      }
     }
   };
 
@@ -285,7 +400,7 @@ const Scene: React.FC = () => {
         <EditModeOverlay />
         <OrbitControls makeDefault />
       </Canvas>
-      {editMode === 'vertex' && selectedPosition && (
+      {(editMode === 'vertex' || editMode === 'edge') && selectedPosition && (
         <VertexCoordinates 
           position={selectedPosition}
           onPositionChange={handlePositionChange}
