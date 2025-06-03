@@ -38,6 +38,7 @@ interface SceneState {
   updateVertexDrag: (position: THREE.Vector3) => void;
   endVertexDrag: () => void;
   updateCylinderVertices: (vertexCount: number) => void;
+  updateSphereVertices: (vertexCount: number) => void;
 }
 
 export const useSceneStore = create<SceneState>((set, get) => ({
@@ -209,6 +210,37 @@ export const useSceneStore = create<SceneState>((set, get) => ({
         vertexCount,
         oldGeometry.parameters.heightSegments,
         oldGeometry.parameters.openEnded,
+        oldGeometry.parameters.thetaStart,
+        oldGeometry.parameters.thetaLength
+      );
+
+      state.selectedObject.geometry.dispose();
+      state.selectedObject.geometry = newGeometry;
+
+      return {
+        ...state,
+        selectedElements: {
+          vertices: [],
+          edges: [],
+          faces: []
+        }
+      };
+    }),
+
+  updateSphereVertices: (vertexCount) =>
+    set((state) => {
+      if (!(state.selectedObject instanceof THREE.Mesh) || 
+          !(state.selectedObject.geometry instanceof THREE.SphereGeometry)) {
+        return state;
+      }
+
+      const oldGeometry = state.selectedObject.geometry;
+      const newGeometry = new THREE.SphereGeometry(
+        oldGeometry.parameters.radius,
+        vertexCount,
+        vertexCount / 2,
+        oldGeometry.parameters.phiStart,
+        oldGeometry.parameters.phiLength,
         oldGeometry.parameters.thetaStart,
         oldGeometry.parameters.thetaLength
       );

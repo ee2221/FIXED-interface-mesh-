@@ -52,14 +52,40 @@ const VertexCoordinates = ({ position, onPositionChange }) => {
 };
 
 const VertexCountSelector = () => {
-  const { selectedObject, updateCylinderVertices } = useSceneStore();
+  const { selectedObject, updateCylinderVertices, updateSphereVertices } = useSceneStore();
 
-  if (!(selectedObject instanceof THREE.Mesh) || 
-      !(selectedObject.geometry instanceof THREE.CylinderGeometry)) {
+  if (!(selectedObject instanceof THREE.Mesh)) {
     return null;
   }
 
-  const currentVertexCount = selectedObject.geometry.parameters.radialSegments;
+  const isCylinder = selectedObject.geometry instanceof THREE.CylinderGeometry;
+  const isSphere = selectedObject.geometry instanceof THREE.SphereGeometry;
+
+  if (!isCylinder && !isSphere) {
+    return null;
+  }
+
+  let currentVertexCount;
+  let options;
+  let onChange;
+
+  if (isCylinder) {
+    currentVertexCount = selectedObject.geometry.parameters.radialSegments;
+    options = [
+      { value: 32, label: '32 Vertices' },
+      { value: 16, label: '16 Vertices' },
+      { value: 8, label: '8 Vertices' }
+    ];
+    onChange = updateCylinderVertices;
+  } else {
+    currentVertexCount = selectedObject.geometry.parameters.widthSegments;
+    options = [
+      { value: 64, label: '64 Vertices' },
+      { value: 32, label: '32 Vertices' },
+      { value: 16, label: '16 Vertices' }
+    ];
+    onChange = updateSphereVertices;
+  }
 
   return (
     <div className="absolute left-1/2 top-4 -translate-x-1/2 bg-black/75 text-white p-4 rounded-lg">
@@ -67,12 +93,12 @@ const VertexCountSelector = () => {
         <label className="text-sm font-medium">Vertex Count:</label>
         <select
           className="bg-gray-800 px-3 py-1.5 rounded text-sm"
-          onChange={(e) => updateCylinderVertices(parseInt(e.target.value))}
+          onChange={(e) => onChange(parseInt(e.target.value))}
           value={currentVertexCount}
         >
-          <option value="32">32 Vertices</option>
-          <option value="16">16 Vertices</option>
-          <option value="8">8 Vertices</option>
+          {options.map(({ value, label }) => (
+            <option key={value} value={value}>{label}</option>
+          ))}
         </select>
       </div>
     </div>

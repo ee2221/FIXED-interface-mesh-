@@ -75,7 +75,7 @@ const Toolbar: React.FC = () => {
             <span className="text-sm font-medium">Cube</span>
           </button>
           <button
-            onClick={() => createObject(new THREE.SphereGeometry(0.5, 32, 32), 'Sphere')}
+            onClick={() => createObject(new THREE.SphereGeometry(0.5, 32, 16), 'Sphere')}
             className="p-2 hover:bg-white/5 rounded-lg transition-colors w-full flex items-center gap-2 text-white/90"
             title="Add Sphere"
           >
