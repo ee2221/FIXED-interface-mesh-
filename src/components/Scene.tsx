@@ -149,45 +149,83 @@ const EdgeLines = ({ geometry, object }) => {
   const positions = geometry.attributes.position;
   const edges = [];
   const worldMatrix = object.matrixWorld;
+  const [lastClickTime, setLastClickTime] = useState(0);
+  const DOUBLE_CLICK_DELAY = 300;
 
-  for (let i = 0; i < positions.count - 1; i++) {
-    const v1 = new THREE.Vector3(
-      positions.getX(i),
-      positions.getY(i),
-      positions.getZ(i)
-    ).applyMatrix4(worldMatrix);
+  // Find all edges and their connected vertices
+  for (let i = 0; i < positions.count; i++) {
+    for (let j = i + 1; j < positions.count; j++) {
+      const v1 = new THREE.Vector3(
+        positions.getX(i),
+        positions.getY(i),
+        positions.getZ(i)
+      );
+      const v2 = new THREE.Vector3(
+        positions.getX(j),
+        positions.getY(j),
+        positions.getZ(j)
+      );
 
-    const v2 = new THREE.Vector3(
-      positions.getX(i + 1),
-      positions.getY(i + 1),
-      positions.getZ(i + 1)
-    ).applyMatrix4(worldMatrix);
-
-    edges.push({ vertices: [i, i + 1], position: v1.clone().add(v2).multiplyScalar(0.5) });
+      // Check if vertices are connected (distance threshold)
+      if (v1.distanceTo(v2) < 2.0) {
+        const worldV1 = v1.clone().applyMatrix4(worldMatrix);
+        const worldV2 = v2.clone().applyMatrix4(worldMatrix);
+        const center = worldV1.clone().add(worldV2).multiplyScalar(0.5);
+        
+        edges.push({
+          vertices: [i, j],
+          position: center,
+          v1: worldV1,
+          v2: worldV2
+        });
+      }
+    }
   }
+
+  // Group overlapping edges
+  const groupedEdges = edges.reduce((groups, edge, index) => {
+    const existingGroup = groups.find(group => 
+      group.some(e => 
+        (e.v1.distanceTo(edge.v1) < 0.001 && e.v2.distanceTo(edge.v2) < 0.001) ||
+        (e.v1.distanceTo(edge.v2) < 0.001 && e.v2.distanceTo(edge.v1) < 0.001)
+      )
+    );
+
+    if (existingGroup) {
+      existingGroup.push({ ...edge, index });
+    } else {
+      groups.push([{ ...edge, index }]);
+    }
+    return groups;
+  }, []);
 
   return editMode === 'edge' ? (
     <group>
-      {edges.map(({ vertices, position }, i) => {
-        const points = vertices.map(v => new THREE.Vector3(
-          positions.getX(v),
-          positions.getY(v),
-          positions.getZ(v)
-        ).applyMatrix4(worldMatrix));
-        
+      {groupedEdges.map((group, groupIndex) => {
+        const firstEdge = group[0];
+        const points = [firstEdge.v1, firstEdge.v2];
         const geometry = new THREE.BufferGeometry().setFromPoints(points);
+        const allVertices = group.flatMap(edge => edge.vertices);
         
         return (
           <line
-            key={i}
+            key={groupIndex}
             geometry={geometry}
             onClick={(e) => {
               e.stopPropagation();
-              startEdgeDrag(i, vertices, position);
+              const now = Date.now();
+              if (now - lastClickTime < DOUBLE_CLICK_DELAY) {
+                startEdgeDrag(
+                  group[0].index,
+                  allVertices,
+                  firstEdge.position
+                );
+              }
+              setLastClickTime(now);
             }}
           >
             <lineBasicMaterial
-              color={selectedElements.edges.includes(i) ? 'red' : 'yellow'}
+              color={group.some(edge => selectedElements.edges.includes(edge.index)) ? 'red' : 'yellow'}
               linewidth={2}
             />
           </line>
