@@ -25,8 +25,9 @@ interface SceneState {
   } | null;
   draggedEdge: {
     vertices: number[];
-    position: THREE.Vector3;
-    initialPosition: THREE.Vector3;
+    startPosition: THREE.Vector3;
+    endPosition: THREE.Vector3;
+    offset: THREE.Vector3;
   } | null;
   addObject: (object: THREE.Object3D, name: string) => void;
   removeObject: (id: string) => void;
@@ -42,7 +43,7 @@ interface SceneState {
   startVertexDrag: (index: number, position: THREE.Vector3) => void;
   updateVertexDrag: (position: THREE.Vector3) => void;
   endVertexDrag: () => void;
-  startEdgeDrag: (vertices: number[], position: THREE.Vector3) => void;
+  startEdgeDrag: (vertices: number[], startPos: THREE.Vector3, endPos: THREE.Vector3) => void;
   updateEdgeDrag: (position: THREE.Vector3) => void;
   endEdgeDrag: () => void;
   updateCylinderVertices: (vertexCount: number) => void;
@@ -204,7 +205,7 @@ export const useSceneStore = create<SceneState>((set, get) => ({
 
   endVertexDrag: () => set({ draggedVertex: null }),
 
-  startEdgeDrag: (vertices, position) =>
+  startEdgeDrag: (vertices, startPos, endPos) =>
     set((state) => {
       if (!(state.selectedObject instanceof THREE.Mesh)) return state;
 
@@ -212,7 +213,6 @@ export const useSceneStore = create<SceneState>((set, get) => ({
       const positions = geometry.attributes.position;
       const allVertices = new Set(vertices);
 
-      // Find overlapping vertices
       vertices.forEach(vertexIndex => {
         const selectedPos = new THREE.Vector3(
           positions.getX(vertexIndex),
@@ -234,11 +234,15 @@ export const useSceneStore = create<SceneState>((set, get) => ({
         }
       });
 
+      const center = startPos.clone().add(endPos).multiplyScalar(0.5);
+      const offset = new THREE.Vector3();
+
       return {
         draggedEdge: {
           vertices: Array.from(allVertices),
-          position: position.clone(),
-          initialPosition: position.clone()
+          startPosition: startPos.clone(),
+          endPosition: endPos.clone(),
+          offset: offset
         }
       };
     }),
@@ -249,13 +253,21 @@ export const useSceneStore = create<SceneState>((set, get) => ({
 
       const geometry = state.selectedObject.geometry;
       const positions = geometry.attributes.position;
+      const movement = position.clone().sub(state.draggedEdge.offset);
       
       state.draggedEdge.vertices.forEach(index => {
+        const currentPos = new THREE.Vector3(
+          positions.getX(index),
+          positions.getY(index),
+          positions.getZ(index)
+        );
+        const newPos = currentPos.add(movement);
+        
         positions.setXYZ(
           index,
-          position.x,
-          position.y,
-          position.z
+          newPos.x,
+          newPos.y,
+          newPos.z
         );
       });
 
@@ -265,7 +277,7 @@ export const useSceneStore = create<SceneState>((set, get) => ({
       return {
         draggedEdge: {
           ...state.draggedEdge,
-          position: position.clone()
+          offset: position.clone()
         }
       };
     }),

@@ -129,9 +129,7 @@ const VertexPoints = ({ geometry, object }) => {
           position={vertex}
           onClick={(e) => {
             e.stopPropagation();
-            if (editMode === 'vertex') {
-              startVertexDrag(i, vertex);
-            }
+            startVertexDrag(i, vertex);
           }}
         >
           <sphereGeometry args={[0.05]} />
@@ -152,7 +150,6 @@ const EdgeLines = ({ geometry, object }) => {
   const edges = new Set();
   const worldMatrix = object.matrixWorld;
 
-  // Create edges based on geometry indices
   if (geometry.index) {
     const indices = geometry.index.array;
     for (let i = 0; i < indices.length; i += 3) {
@@ -179,25 +176,15 @@ const EdgeLines = ({ geometry, object }) => {
           positions.getY(v2),
           positions.getZ(v2)
         ).applyMatrix4(worldMatrix);
-        const center = start.clone().add(end).multiplyScalar(0.5);
 
         return (
           <group key={edge}>
-            <mesh
-              position={center}
+            <line
               onClick={(e) => {
                 e.stopPropagation();
-                startEdgeDrag([v1, v2], center);
+                startEdgeDrag([v1, v2], start, end);
               }}
             >
-              <sphereGeometry args={[0.05]} />
-              <meshBasicMaterial
-                color={selectedElements.edges.includes(v1) && selectedElements.edges.includes(v2) ? 'red' : 'blue'}
-                transparent
-                opacity={0.5}
-              />
-            </mesh>
-            <line>
               <bufferGeometry>
                 <bufferAttribute
                   attach="attributes-position"
@@ -206,7 +193,10 @@ const EdgeLines = ({ geometry, object }) => {
                   itemSize={3}
                 />
               </bufferGeometry>
-              <lineBasicMaterial color="blue" />
+              <lineBasicMaterial
+                color={selectedElements.edges.includes(v1) && selectedElements.edges.includes(v2) ? 'red' : 'blue'}
+                linewidth={2}
+              />
             </line>
           </group>
         );
@@ -241,7 +231,7 @@ const EditModeOverlay = () => {
         plane.current.normal.copy(cameraDirection);
         plane.current.setFromNormalAndCoplanarPoint(
           cameraDirection,
-          draggedVertex ? draggedVertex.position : draggedEdge.position
+          draggedVertex ? draggedVertex.position : draggedEdge.startPosition
         );
 
         raycaster.setFromCamera(pointer, camera);
@@ -322,7 +312,7 @@ const Scene: React.FC = () => {
         setSelectedPosition(null);
       }
     } else if (editMode === 'edge' && selectedObject instanceof THREE.Mesh && draggedEdge) {
-      setSelectedPosition(draggedEdge.position);
+      setSelectedPosition(draggedEdge.startPosition);
     } else {
       setSelectedPosition(null);
     }
