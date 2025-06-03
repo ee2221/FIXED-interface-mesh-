@@ -68,9 +68,9 @@ const VertexCountSelector = () => {
           onChange={(e) => updateCylinderVertices(parseInt(e.target.value))}
           value={selectedObject.geometry.parameters.radialSegments}
         >
+          <option value="32">32 Vertices</option>
           <option value="16">16 Vertices</option>
           <option value="8">8 Vertices</option>
-          <option value="4">4 Vertices</option>
         </select>
       </div>
     </div>
