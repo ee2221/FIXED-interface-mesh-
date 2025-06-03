@@ -52,7 +52,7 @@ const VertexCoordinates = ({ position, onPositionChange }) => {
 };
 
 const VertexCountSelector = () => {
-  const { selectedObject, updateCylinderVertices, updateSphereVertices } = useSceneStore();
+  const { selectedObject, updateCylinderVertices, updateSphereVertices, updateConeBaseVertices } = useSceneStore();
 
   if (!(selectedObject instanceof THREE.Mesh)) {
     return null;
@@ -60,14 +60,16 @@ const VertexCountSelector = () => {
 
   const isCylinder = selectedObject.geometry instanceof THREE.CylinderGeometry;
   const isSphere = selectedObject.geometry instanceof THREE.SphereGeometry;
+  const isCone = selectedObject.geometry instanceof THREE.ConeGeometry;
 
-  if (!isCylinder && !isSphere) {
+  if (!isCylinder && !isSphere && !isCone) {
     return null;
   }
 
   let currentVertexCount;
   let options;
   let onChange;
+  let label = 'Vertex Count:';
 
   if (isCylinder) {
     currentVertexCount = selectedObject.geometry.parameters.radialSegments;
@@ -77,7 +79,7 @@ const VertexCountSelector = () => {
       { value: 8, label: '8 Vertices' }
     ];
     onChange = updateCylinderVertices;
-  } else {
+  } else if (isSphere) {
     currentVertexCount = selectedObject.geometry.parameters.widthSegments;
     options = [
       { value: 64, label: '64 Vertices' },
@@ -86,12 +88,21 @@ const VertexCountSelector = () => {
       { value: 8, label: '8 Vertices' }
     ];
     onChange = updateSphereVertices;
+  } else {
+    currentVertexCount = selectedObject.geometry.parameters.radialSegments;
+    options = [
+      { value: 32, label: '32 Vertices' },
+      { value: 16, label: '16 Vertices' },
+      { value: 8, label: '8 Vertices' }
+    ];
+    onChange = updateConeBaseVertices;
+    label = 'Base Vertex Count:';
   }
 
   return (
     <div className="absolute left-1/2 top-4 -translate-x-1/2 bg-black/75 text-white p-4 rounded-lg">
       <div className="flex items-center gap-2">
-        <label className="text-sm font-medium">Vertex Count:</label>
+        <label className="text-sm font-medium">{label}</label>
         <select
           className="bg-gray-800 px-3 py-1.5 rounded text-sm"
           onChange={(e) => onChange(parseInt(e.target.value))}
