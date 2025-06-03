@@ -39,7 +39,6 @@ interface SceneState {
   endVertexDrag: () => void;
   updateCylinderVertices: (vertexCount: number) => void;
   updateSphereVertices: (vertexCount: number) => void;
-  updateConeBaseVertices: (vertexCount: number) => void;
 }
 
 export const useSceneStore = create<SceneState>((set, get) => ({
@@ -242,37 +241,6 @@ export const useSceneStore = create<SceneState>((set, get) => ({
         vertexCount / 2,
         oldGeometry.parameters.phiStart,
         oldGeometry.parameters.phiLength,
-        oldGeometry.parameters.thetaStart,
-        oldGeometry.parameters.thetaLength
-      );
-
-      state.selectedObject.geometry.dispose();
-      state.selectedObject.geometry = newGeometry;
-
-      return {
-        ...state,
-        selectedElements: {
-          vertices: [],
-          edges: [],
-          faces: []
-        }
-      };
-    }),
-
-  updateConeBaseVertices: (vertexCount) =>
-    set((state) => {
-      if (!(state.selectedObject instanceof THREE.Mesh) || 
-          !(state.selectedObject.geometry instanceof THREE.ConeGeometry)) {
-        return state;
-      }
-
-      const oldGeometry = state.selectedObject.geometry;
-      const newGeometry = new THREE.ConeGeometry(
-        oldGeometry.parameters.radius,
-        oldGeometry.parameters.height,
-        vertexCount,
-        oldGeometry.parameters.heightSegments,
-        oldGeometry.parameters.openEnded,
         oldGeometry.parameters.thetaStart,
         oldGeometry.parameters.thetaLength
       );
