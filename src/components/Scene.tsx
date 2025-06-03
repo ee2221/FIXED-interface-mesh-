@@ -152,16 +152,30 @@ const EdgeLines = ({ geometry, object }) => {
   const edges = [];
   const worldMatrix = object.matrixWorld;
 
-  // Create edge pairs based on geometry indices
-  for (let i = 0; i < positions.count; i += 3) {
-    edges.push([i, i + 1]);
-    edges.push([i + 1, i + 2]);
-    edges.push([i + 2, i]);
+  // Get indices from the geometry
+  const index = geometry.index;
+  if (!index) return null;
+
+  // Create edges from triangles
+  for (let i = 0; i < index.count; i += 3) {
+    const a = index.array[i];
+    const b = index.array[i + 1];
+    const c = index.array[i + 2];
+    
+    // Add edges (avoiding duplicates)
+    edges.push([a, b]);
+    edges.push([b, c]);
+    edges.push([c, a]);
   }
+
+  // Remove duplicate edges
+  const uniqueEdges = Array.from(new Set(edges.map(edge => 
+    edge.slice().sort().join(',')
+  ))).map(edge => edge.split(',').map(Number));
 
   return editMode === 'edge' ? (
     <group>
-      {edges.map(([start, end], i) => {
+      {uniqueEdges.map(([start, end], i) => {
         const startPos = new THREE.Vector3(
           positions.getX(start),
           positions.getY(start),
@@ -181,7 +195,10 @@ const EdgeLines = ({ geometry, object }) => {
             <line
               onClick={(e) => {
                 e.stopPropagation();
-                startEdgeDrag([start, end], [startPos, endPos]);
+                if (editMode === 'edge') {
+                  startEdgeDrag([start, end], [startPos, endPos]);
+                  useSceneStore.getState().setSelectedElements('edges', [i]);
+                }
               }}
             >
               <bufferGeometry>
