@@ -291,7 +291,7 @@ const Scene: React.FC = () => {
           onPositionChange={handlePositionChange}
         />
       )}
-      {editMode === 'vertex' && selectedObject && (
+      {editMode === 'vertex' && selectedObject && !(selectedObject.geometry instanceof THREE.ConeGeometry) && (
         <VertexCountSelector />
       )}
     </div>
